@@ -24,6 +24,24 @@ The 30-second version:
 
 Every code block below was actually run against this repository. The Python and YAML blocks run in order on the tape recorded by the first one; the shell blocks only need the fixtures that ship inside the package. The output under a block is the output of that run.
 
+## What this is not
+
+Five claims survive review, and they are the whole product:
+
+- **Zero runtime dependencies.** `dependencies = []` in `pyproject.toml`; PyYAML is an optional extra for `asserts.yaml`, and a CI job uninstalls it to prove the core does not need it.
+- **A local file is the whole environment.** A tape is JSONL you can read, diff and review in a pull request, not a row in somebody's database.
+- **No network and no model call during replay.** Not "usually": replay is a lookup, and `allow_real=True` raises instead of falling back to a real tool.
+- **A changed request is exit code 2, not a warning.** `PromptDrift` / `ArgsDrift` / `FingerprintDrift` / `TapeMiss` are hard failures; the one thing this project refuses to do is go green because a prompt changed.
+- **No LLM-as-a-judge.** The verdict is an assertion over the recorded trajectory and a process exit code. Nothing asks a model whether the run looked good.
+
+What that excludes, deliberately: model-quality evaluation, production tracing or observability, a hosted dashboard, and re-running a model to "reproduce" a failure.
+
+| Tool | What it fixes | Where AgentTwin differs |
+| --- | --- | --- |
+| VCR.py | HTTP cassettes | the object being frozen is an agent trajectory — tool order, call budgets, termination, state invariants |
+| toolsnap / traceplay | record and replay inside the agent loop | AgentTwin also freezes the LLM boundary, so the tape is the whole environment and CI needs no key |
+| Langfuse / LangSmith / Braintrust | traces, datasets, experiments, hosted evaluation | those are platform-shaped and online; AgentTwin is one file and an exit code that works with the network unplugged |
+
 ## 1. Record one run
 
 `record_demo.py`
@@ -225,6 +243,50 @@ PASS  max_repeats(lookup_order, n=1)
 PASS  never_calls(refund)
 PASS  terminates_within(n=10)
 exit code: 0
+```
+
+## The whole loop, and the three ways it breaks
+
+Ten minutes, no API key. `examples/quickstart.py` records a run, judges it, changes one thing in the controller, records again, and shows the same assertions flipping:
+
+```bash
+PYTHONPATH=src python examples/quickstart.py
+```
+
+Output:
+
+```text
+step 1  record one run
+  tape build/quickstart/deploy.jsonl (6 events)
+step 2  replay it offline and assert
+  FAIL  max_repeats(deploy, n=1)  -- 2 calls of deploy exceeds the limit of 1; first excess at seq 3  (seq 3)
+  PASS  never_calls(rollback)  -- no call of rollback matches
+  PASS  terminates_within(n=8)  -- terminal at seq 5 < 8
+  exit code 1
+step 3  change the controller and record again
+  tape build/quickstart/deploy-fixed.jsonl (3 events)
+step 4  the same assertions, on the new tape
+  PASS  max_repeats(deploy, n=1)  -- 1 call(s) of deploy (limit 1)
+  PASS  never_calls(rollback)  -- no call of rollback matches
+  PASS  terminates_within(n=8)  -- terminal at seq 2 < 8
+  exit code 0
+verdict: 1 -> 0
+```
+
+The interesting part is what a broken run can look like. `tools/break_it.py` attacks one tape three ways and gets three different verdicts, which is why a changed request is never reported as a failed assertion:
+
+```bash
+PYTHONPATH=src python tools/break_it.py
+```
+
+Output:
+
+```text
+tape build/break-it/deploy.jsonl (6 events)
+case 1  changed prompt     -> PromptDrift    exit code 2
+case 2  changed tool args  -> ArgsDrift      exit code 2
+case 3  bad behaviour      -> FAIL never_calls(deploy)  exit code 1
+verdict: all three as documented
 ```
 
 ## What this tape does not promise

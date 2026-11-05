@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 EN = ROOT / "README.md"
 ZH = ROOT / "README.zh-CN.md"
 SWITCH = "[English](README.md) · [中文](README.zh-CN.md)"
-EXPECTED_BLOCKS = 15
-EXPECTED_SECTIONS = 8
+EXPECTED_BLOCKS = 19
+EXPECTED_SECTIONS = 10
 FENCE = "```"
 CJK = re.compile(r"[\u4e00-\u9fff]")
 

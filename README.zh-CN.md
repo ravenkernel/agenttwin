@@ -24,6 +24,24 @@
 
 下面每个代码块都在本仓库上实际跑过。Python 与 YAML 块按顺序使用第 1 块录出的那条 tape；shell 块只用到包内自带的 fixture。块下面的输出就是那次运行的输出。
 
+## 不是什么
+
+经得起推敲的只有五条，而这五条就是全部卖点：
+
+- **运行时零第三方依赖。** `pyproject.toml` 里 `dependencies = []`；PyYAML 只是 `asserts.yaml` 的可选额外依赖，还有一个 CI job 专门把它卸掉来证明核心不需要它。
+- **一个本地文件就是全部环境。** tape 是能读、能 diff、能在 PR 里 review 的 JSONL，不是别人数据库里的一行。
+- **回放期间不联网、不调模型。** 不是「通常不」：回放就是查表，`allow_real=True` 直接抛异常，绝不退化成调用真实工具。
+- **请求变了就是退出码 2，不是警告。** `PromptDrift` / `ArgsDrift` / `FingerprintDrift` / `TapeMiss` 一律硬失败；这个项目唯一拒绝做的事，就是「prompt 改了但测试还是绿的」。
+- **没有 LLM-as-a-judge。** 判定是对录制轨迹的断言加一个进程退出码，不会去问模型「这次跑得好不好」。
+
+因此它刻意不做：模型质量评测、生产 tracing 与可观测、托管 dashboard，以及「重跑模型来复现一次失败」。
+
+| 工具 | 它固定的是什么 | AgentTwin 的差别 |
+| --- | --- | --- |
+| VCR.py | HTTP cassette | 这里冻结的对象是 agent 轨迹——工具顺序、调用预算、终止条件、状态不变量 |
+| toolsnap / traceplay | agent 循环内的录制回放 | AgentTwin 连 LLM 边界一起冻结，所以 tape 就是全部环境，CI 不需要任何 key |
+| Langfuse / LangSmith / Braintrust | trace、dataset、实验、托管评测 | 那些是平台形态且在线；AgentTwin 是一个文件加一个退出码，断网也能跑 |
+
 ## 1. 录一次
 
 `record_demo.py`
@@ -225,6 +243,50 @@ PASS  max_repeats(lookup_order, n=1)
 PASS  never_calls(refund)
 PASS  terminates_within(n=10)
 exit code: 0
+```
+
+## 整条闭环，以及它坏掉的三种样子
+
+十分钟，不需要 API key。`examples/quickstart.py` 录一次、判一次、改控制器里的一个决定、再录一次，同一组断言从红变绿：
+
+```bash
+PYTHONPATH=src python examples/quickstart.py
+```
+
+输出：
+
+```text
+step 1  record one run
+  tape build/quickstart/deploy.jsonl (6 events)
+step 2  replay it offline and assert
+  FAIL  max_repeats(deploy, n=1)  -- 2 calls of deploy exceeds the limit of 1; first excess at seq 3  (seq 3)
+  PASS  never_calls(rollback)  -- no call of rollback matches
+  PASS  terminates_within(n=8)  -- terminal at seq 5 < 8
+  exit code 1
+step 3  change the controller and record again
+  tape build/quickstart/deploy-fixed.jsonl (3 events)
+step 4  the same assertions, on the new tape
+  PASS  max_repeats(deploy, n=1)  -- 1 call(s) of deploy (limit 1)
+  PASS  never_calls(rollback)  -- no call of rollback matches
+  PASS  terminates_within(n=8)  -- terminal at seq 2 < 8
+  exit code 0
+verdict: 1 -> 0
+```
+
+有意思的是「坏掉」有多少种样子。`tools/break_it.py` 对同一条 tape 做三种破坏，得到三种不同的结论——这也是为什么请求变了永远不会被报成断言失败：
+
+```bash
+PYTHONPATH=src python tools/break_it.py
+```
+
+输出：
+
+```text
+tape build/break-it/deploy.jsonl (6 events)
+case 1  changed prompt     -> PromptDrift    exit code 2
+case 2  changed tool args  -> ArgsDrift      exit code 2
+case 3  bad behaviour      -> FAIL never_calls(deploy)  exit code 1
+verdict: all three as documented
 ```
 
 ## 本 tape 不承诺什么
