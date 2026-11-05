@@ -25,7 +25,7 @@ from .trace import (
     sha256_hex,
 )
 
-__version__: str = "0.1.1"
+__version__: str = "0.1.2"
 
 _LAZY: dict[str, str] = {
     "Twin": ".env",

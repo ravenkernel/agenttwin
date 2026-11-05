@@ -33,6 +33,42 @@ at the repository — the project had no published demo at all.
 - Both README editions carry three badges (PyPI, CI, coverage floor) and link
   the online demo.
 
+## 0.1.2 — 2026-11-05
+
+The first release with outside contributions, and the release that finally
+makes the PyPI page match the repository.  The tape format is still `schema
+0.1`: every tape recorded with 0.1.0 or 0.1.1 replays unchanged.
+
+### Added
+
+- `agenttwin diff A B --json [PATH]` prints or writes the comparison as JSON
+  (`first_divergence_seq`, per-change counts, the changed rows) with the same
+  0/1/2 exit codes.  Thanks @Doomguy-BFG9000 (#6, closes #1).
+- `agenttwin gallery run <id> --html PATH` writes the fixture's report as the
+  single-file viewer, keeping the Markdown output and the exit code identical.
+  Thanks @Doomguy-BFG9000 (#9, closes #4).
+- A `terminates_within` before/after pair in the gallery (`late_stop` /
+  `early_stop`), which brings it to twelve fixture tapes in six pairs — one per
+  assertion family.  Thanks @Doomguy-BFG9000 (#7, closes #2).
+- Markdown reports carry a `fingerprint:` line naming the model, Python and
+  package version that recorded the tape, in the same order the HTML viewer
+  uses.  Thanks @Doomguy-BFG9000 (#8, closes #3).
+
+### Fixed
+
+- The published README pointed at `assets/hero.gif`, which this repository had
+  renamed to `hero-full.gif` — so the image on the PyPI page was broken.  The
+  old path is kept as a copy of the six-second loop, and the description now
+  links assets that exist.
+
+### Changed
+
+- The PyPI description carries the badges, the six-second loop and the link to
+  the online demo at <https://ravenkernel.github.io/agenttwin/>.
+- `tools/gen_fixtures.py` retains each committed fixture's original
+  `env_fingerprint` when regenerating, so the byte-for-byte check no longer
+  depends on the machine that runs it.
+
 ## 0.1.1 — 2026-11-05
 
 Documentation, one viewer fix and one change of meaning; the tape format is

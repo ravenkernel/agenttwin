@@ -317,13 +317,15 @@ strict: no
 
 `python -m agenttwin gallery run late_stop` 退出 1：导出早已完成，控制器却继续轮询，直到有限保护次数用尽，在 seq 9 返回。`python -m agenttwin gallery run early_stop` 退出 0：只改 `stop_on_done`，就在 seq 3 返回。两者使用同一个 `terminates_within(9)`，要求 terminal 的 seq 严格小于 9；两者的重复次数和调用预算断言都通过。
 
+有两个参数是专门给 CI 用的。`agenttwin gallery run <id> --html PATH` 会额外写出一份和库本身同样的单文件回放器，Markdown 输出与退出码保持原样（`deathloop` 是 1，`repaired` 是 0）。`agenttwin diff A B --json [PATH]` 把比较结果打印成 JSON 或写进文件——`first_divergence_seq`、各类变更的计数、以及变更的行——退出码不变：两条 tape 一致是 0，有分歧是 1，有一条读不出来是 2。
+
 ## 状态
 
-0.1.1 已发布：[PyPI 上的 agenttwin](https://pypi.org/project/agenttwin/0.1.1/)，Apache-2.0，Python 3.10+。每个版本改了什么见 [CHANGELOG.md](CHANGELOG.md)。
+0.1.2 已发布：[PyPI 上的 agenttwin](https://pypi.org/project/agenttwin/0.1.2/)，Apache-2.0，Python 3.10+。每个版本改了什么见 [CHANGELOG.md](CHANGELOG.md)。
 
 - 已完成并有测试：录制/回放核心（`Twin.record` / `Twin.load`）、drift 检测、9 个断言工厂 + 组合子 + YAML 加载、`TraceDiff`、`Report`（JSON / Markdown / 单文件 HTML）、`agenttwin` 的五个子命令、openai-compatible adapter（鸭子类型，不 import SDK）、十二个内置 fixture（六组 before / after）。
 - 已在 GitHub 上验证：[CI](https://github.com/ravenkernel/agenttwin/actions) 在每次 push 到 `main` 时运行，共九个 job：Ubuntu 上的 Python 3.10–3.13、macOS 与 Windows 上的 3.12、两个先卸载 PyYAML 的 stdlib-only import 检查，再加一个覆盖率 job，每个 tests job 还都跑一次控制台脚本。首次运行失败在一条用了 `platform: linux` 的 fixture 上——它恰好与 Ubuntu runner 上真实的 `sys.platform` 相同；那是测试的 bug，已在 `6c5dae7` 修掉，之后全绿。
-- 从干净安装验证过：在空 venv 里从公共索引 `python -m pip install agenttwin`，得到 `agenttwin --version` → `agenttwin 0.1.1`、`agenttwin gallery list` 的十个 fixture、包内的单文件 HTML 回放器，以及 `gallery run repaired` → 0、`gallery run deathloop` → 1。在仓库之外的空目录里跑一遍录制 → 离线回放 → `.html()`，产出的报告占位符已填、内部没有任何外部资源。
+- 从干净安装验证过：在空 venv 里从公共索引 `python -m pip install agenttwin`，得到 `agenttwin --version` → `agenttwin 0.1.2`、`agenttwin gallery list` 的十二个 fixture、包内的单文件 HTML 回放器，以及 `gallery run repaired` → 0、`gallery run deathloop` → 1。在仓库之外的空目录里跑一遍录制 → 离线回放 → `.html()`，产出的报告占位符已填、内部没有任何外部资源。
 - 覆盖率门槛：语句覆盖率 82%，只写在 `pyproject.toml` 一处（`[tool.coverage.report] fail_under`），由 `coverage` 这个 CI job 执行——跌破就红。当前实测 94%。
 - 还没做：任何托管服务或 dashboard。上面所有示例都用 `PYTHONPATH=src` 运行，不装任何东西也能跑。
 
